@@ -1,0 +1,24 @@
+Bundle-Name: ServiceDiscovery Service Bundle
+Bundle-SymbolicName: ServiceDiscovery
+Bundle-Activator: it.water.implementation.osgi.bundle.WaterBundleActivator
+Import-Package: \
+    org.osgi.framework.*,\
+    org.osgi.service.*,\
+    org.osgi.util.*,\
+    org.slf4j,\
+    org.apache.aries.jpa.*,\
+    org.apache.aries.cdi.*,\
+    javassist.util.proxy,\
+    jakarta.validation,\
+    jakarta.validation.*,\
+	jakarta.persistence,\
+    jakarta.transaction,\
+    jakarta.enterprise.*,\
+    it.water.core.*,\
+    it.water.repository.*,\
+    it.water.service.rest.*,\
+    it.water.implementation.osgi.*
+Export-Package: \
+    it.water.service.discovery.*
+DynamicImport-Package: *
+-cdiannotations: *;discover=annotated_by_bean

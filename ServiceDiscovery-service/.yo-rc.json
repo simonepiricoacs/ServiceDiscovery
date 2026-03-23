@@ -1,0 +1,9 @@
+{
+    "generator-water": {
+        "inner-project": true,
+        "project-type": "service",
+        "projectName": "ServiceDiscovery",
+        "projectGroupId": "it.water.service.discovery",
+        "projectVersion": "project.waterVersion"
+    }
+}
