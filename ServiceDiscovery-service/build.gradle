@@ -99,6 +99,7 @@ waterDescriptor {
     description = 'Service registry and discovery for Water Framework microservice mesh'
 
     output {
+        standardPin 'jdbc'
         standardPin 'service-discovery'
     }
 }
