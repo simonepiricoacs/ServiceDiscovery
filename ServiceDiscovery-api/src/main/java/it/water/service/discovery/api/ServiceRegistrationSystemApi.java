@@ -27,6 +27,22 @@ public interface ServiceRegistrationSystemApi extends BaseEntitySystemApi<Servic
     ServiceRegistration registerInternal(ServiceRegistration service);
 
     /**
+     * Deregisters a service instance by logical key.
+     *
+     * @param serviceName logical service name
+     * @param instanceId runtime instance identifier
+     */
+    void deregisterByKey(String serviceName, String instanceId);
+
+    /**
+     * Updates the heartbeat timestamp for a service instance and marks it as UP.
+     *
+     * @param serviceName logical service name
+     * @param instanceId runtime instance identifier
+     */
+    boolean updateHeartbeatInternal(String serviceName, String instanceId);
+
+    /**
      * Performs batch health check on all registered services.
      *
      * @return map of instanceId -> ServiceStatus
@@ -41,6 +57,14 @@ public interface ServiceRegistrationSystemApi extends BaseEntitySystemApi<Servic
      * @param inactiveThresholdSeconds the inactivity threshold in seconds
      */
     void cleanupInactiveServices(int inactiveThresholdSeconds);
+
+    /**
+     * Finds services by status bypassing permission checks.
+     *
+     * @param status the service status
+     * @return list of matching services
+     */
+    List<ServiceRegistration> findByStatus(ServiceStatus status);
 
     /**
      * Finds services using a custom query.

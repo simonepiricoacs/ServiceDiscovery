@@ -1,165 +1,141 @@
 # ServiceDiscovery Module
 
-The **ServiceDiscovery** module provides a service registration and discovery system for the Water Framework. It enables microservices to register themselves, perform health checks, send heartbeats, and discover other available services in a distributed environment.
+The **ServiceDiscovery** module is the Water service registry. Microservices use it to:
 
-## Architecture Overview
-
-```mermaid
-graph TD
-    A[ServiceDiscovery Module] --> B[ServiceDiscovery-api]
-    A --> C[ServiceDiscovery-model]
-    A --> D[ServiceDiscovery-service]
-    A --> E[ServiceDiscovery-service-spring]
-
-    B -->|defines| F[ServiceRegistrationApi / SystemApi / RestApi]
-    C -->|entity| G[ServiceRegistration]
-    C -->|enum| H[ServiceStatus]
-    D -->|implementation| I[Services + Repository + REST Controller]
-    E -->|Spring variant| J[Spring-specific beans]
-```
+- register themselves on startup
+- refresh liveness through heartbeat
+- deregister on shutdown
+- expose the current list of `UP` instances to internal consumers such as `ApiGateway`
 
 ## Sub-modules
 
 | Sub-module | Description |
 |---|---|
-| **ServiceDiscovery-api** | Defines `ServiceRegistrationApi`, `ServiceRegistrationSystemApi`, `ServiceRegistrationRestApi`, `ConfigManager`, and `ConfigChangeListener` interfaces |
-| **ServiceDiscovery-model** | Contains the `ServiceRegistration` JPA entity, `ServiceStatus` enum, and custom `ServiceDiscoveryActions` |
-| **ServiceDiscovery-service** | Default implementation of services, repository, REST controller, and in-memory `ConfigManager` |
-| **ServiceDiscovery-service-spring** | Spring-specific service registration |
+| **ServiceDiscovery-api** | Public API, system API, repository API and REST contracts |
+| **ServiceDiscovery-model** | `ServiceRegistration`, `ServiceStatus`, `ServiceDiscoveryActions` |
+| **ServiceDiscovery-service** | JPA repository, service/system implementations, JAX-RS controllers, cleanup scheduler |
+| **ServiceDiscovery-service-spring** | Spring MVC controllers and Spring Boot wiring |
 
-## ServiceRegistration Entity
+## ServiceRegistration model
 
-```java
-@Entity
-@Table(name = "service_registration",
-       uniqueConstraints = @UniqueConstraint(columnNames = {"serviceName", "instanceId"}))
-@AccessControl(availableActions = { CrudActions.class, ServiceDiscoveryActions.class },
-    rolesPermissions = {
-        @DefaultRoleAccess(roleName = "serviceDiscoveryManager", actions = { "save","update","find","find_all","remove","health_check" }),
-        @DefaultRoleAccess(roleName = "serviceDiscoveryViewer", actions = { "find", "find_all" }),
-        @DefaultRoleAccess(roleName = "serviceDiscoveryOperator", actions = { "find","find_all","health_check" })
-    })
-public class ServiceRegistration extends AbstractJpaEntity implements ProtectedEntity, OwnedResource {
-    // ...
-}
-```
+The registry entry is identified by the logical key:
 
-### Entity Fields
+- `serviceName`
+- `instanceId`
 
-| Field | Type | Constraints | Description |
-|---|---|---|---|
-| `serviceName` | String | `@NotNull`, unique (composite) | Name of the registered service |
-| `serviceVersion` | String | — | Version identifier |
-| `instanceId` | String | `@NotNull`, unique (composite) | Unique instance identifier |
-| `endpoint` | String | `@NotNull` | Service endpoint URL |
-| `protocol` | String | — | Communication protocol (HTTP, gRPC, etc.) |
-| `description` | String | — | Human-readable description |
-| `tags` | Set\<String\> | — | Tags for discovery filtering |
-| `metadata` | Map\<String, String\> | — | Arbitrary key-value metadata |
-| `status` | ServiceStatus | — | Current service status |
-| `lastHeartbeat` | LocalDateTime | — | Last heartbeat timestamp |
-| `healthCheckInterval` | Integer | — | Health check interval in seconds |
-| `healthCheckEndpoint` | String | — | Health check URL path |
-| `configuration` | String | — | Service configuration data |
-| `ownerUserId` | Long | — | Owner user ID |
+The most relevant fields are:
 
-### Service Status Lifecycle
-
-```mermaid
-stateDiagram-v2
-    [*] --> STARTING
-    STARTING --> UP: registration complete
-    UP --> DOWN: health check failed
-    DOWN --> UP: health check recovered
-    UP --> OUT_OF_SERVICE: manual deactivation
-    OUT_OF_SERVICE --> UP: reactivation
-    DOWN --> OUT_OF_SERVICE: manual intervention
-```
-
-## API Interfaces
-
-### ServiceRegistrationApi (Public — with permission checks)
-
-| Method | Description |
+| Field | Description |
 |---|---|
-| `register(ServiceRegistration)` | Register a new service instance |
-| `deregister(String serviceName, String instanceId)` | Remove a service registration |
-| `findByServiceName(String)` | Find services by name |
-| `findByTags(Set<String>)` | Find services by tags |
-| `findByStatus(ServiceStatus)` | Find services by status |
-| `getAvailableServices()` | Get all services with status `UP` |
-| `updateHeartbeat(String serviceName, String instanceId)` | Update heartbeat timestamp |
-| `performHealthCheck(String serviceName, String instanceId)` | Execute a health check |
+| `serviceName` | Logical service identifier shared by all instances of the same service |
+| `serviceVersion` | Service version reported by the instance |
+| `instanceId` | Unique runtime instance identifier |
+| `endpoint` | Reachable base endpoint for the instance |
+| `protocol` | Transport protocol, typically `http` |
+| `status` | Registry status: `STARTING`, `UP`, `DOWN`, `OUT_OF_SERVICE` |
+| `lastHeartbeat` | Last liveness update received by the registry |
+| `healthCheckInterval` | Optional heartbeat/health-check cadence metadata |
+| `healthCheckEndpoint` | Optional endpoint metadata for health probing |
+| `metadata` | Reserved extension map persisted and exposed by the REST contract |
+| `configuration` | Reserved extension payload persisted and exposed by the REST contract |
 
-### ServiceRegistrationSystemApi (System — no permission checks)
+`metadata` and `configuration` are intentionally kept in the entity contract, but the current module does not interpret them.
 
-| Method | Description |
-|---|---|
-| `registerInternal(ServiceRegistration)` | Internal registration (no auth required) |
-| `performBatchHealthCheck()` | Health check all registered services |
-| `cleanupInactiveServices(int thresholdSeconds)` | Remove services that missed heartbeats |
-| `findByCustomQuery(Query)` | Custom query-based search |
-| `updateStatus(String serviceName, String instanceId, ServiceStatus)` | Update service status directly |
+## Security model
 
-### REST Endpoints
+`ServiceDiscoveryActions` currently exposes a single service-specific action:
 
-| HTTP Method | Path | Action |
-|---|---|---|
-| `POST` | `/water/services` | Register a service |
-| `DELETE` | `/water/services/{name}/{instanceId}` | Deregister a service |
-| `GET` | `/water/services?name={name}` | Find by service name |
-| `GET` | `/water/services?status={status}` | Find by status |
-| `GET` | `/water/services/available` | Get all available (UP) services |
-| `PUT` | `/water/services/{name}/{instanceId}/heartbeat` | Update heartbeat |
-| `POST` | `/water/services/{name}/{instanceId}/health` | Perform health check |
+- `health_check`
 
-## Default Roles
+Default roles:
 
 | Role | Permissions |
 |---|---|
 | **serviceDiscoveryManager** | `save`, `update`, `find`, `find_all`, `remove`, `health_check` |
 | **serviceDiscoveryViewer** | `find`, `find_all` |
-| **serviceDiscoveryOperator** | `find`, `find_all`, `health_check` |
+| **serviceDiscoveryOperator** | `find`, `find_all`, `update`, `health_check` |
 
-## Configuration
+## REST boundaries
 
-The module includes a `ConfigManager` interface with a default `InMemoryConfigManager` implementation for managing service discovery configuration at runtime. Implement `ConfigChangeListener` to react to configuration changes.
+### Public authenticated API
 
-## Usage Example
+Base path: `/water/api/serviceregistration`
 
-```java
-// Register a service
-@Inject
-private ServiceRegistrationApi serviceRegistrationApi;
+This is the standard CRUD boundary. It remains JWT-protected and is intended for administrative access.
 
-ServiceRegistration registration = new ServiceRegistration();
-registration.setServiceName("payment-service");
-registration.setServiceVersion("1.0.0");
-registration.setInstanceId("payment-01");
-registration.setEndpoint("http://payment-01:8080");
-registration.setProtocol("HTTP");
-registration.setStatus(ServiceStatus.UP);
-registration.setHealthCheckEndpoint("/health");
-registration.setHealthCheckInterval(30);
+| Method | Path |
+|---|---|
+| `POST` | `/water/api/serviceregistration` |
+| `PUT` | `/water/api/serviceregistration` |
+| `GET` | `/water/api/serviceregistration/{id}` |
+| `GET` | `/water/api/serviceregistration` |
+| `DELETE` | `/water/api/serviceregistration/{id}` |
 
-serviceRegistrationApi.register(registration);
+### Internal anonymous API
 
-// Discover available services
-Collection<ServiceRegistration> available = serviceRegistrationApi.getAvailableServices();
+Base path: `/water/internal/serviceregistration`
 
-// Heartbeat
-serviceRegistrationApi.updateHeartbeat("payment-service", "payment-01");
+This boundary is intentionally anonymous and is used for infrastructure-to-infrastructure traffic inside the runtime.
 
-// Cleanup stale services (system-level)
-@Inject
-private ServiceRegistrationSystemApi systemApi;
-systemApi.cleanupInactiveServices(120); // 2 minutes threshold
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/water/internal/serviceregistration/register` | Service self-registration |
+| `GET` | `/water/internal/serviceregistration/available` | Read only `UP` instances |
+| `DELETE` | `/water/internal/serviceregistration/{serviceName}/{instanceId}` | Service deregistration by logical key |
+| `PUT` | `/water/internal/serviceregistration/heartbeat/{serviceName}/{instanceId}` | Heartbeat refresh |
+
+## Runtime behavior
+
+The module is centered on the `ServiceRegistrationSystemApi` system layer.
+
+Relevant operations:
+
+- `registerInternal(...)`
+- `deregisterByKey(serviceName, instanceId)`
+- `updateHeartbeatInternal(serviceName, instanceId)`
+- `cleanupInactiveServices(thresholdSeconds)`
+- `performBatchHealthCheck()`
+
+Important runtime semantics:
+
+- heartbeat on a missing registration returns `404` through the internal REST boundary
+- cleanup marks stale registrations out of the healthy set
+- `available` returns only instances currently marked `UP`
+
+## Repository notes
+
+The repository exposes lookup by:
+
+- logical key `serviceName + instanceId`
+- `serviceName`
+- `status`
+- tags
+- stale heartbeat timestamps
+
+Bulk status/heartbeat transitions use JPQL update statements to keep those operations atomic.
+
+## Integration with ApiGateway
+
+`ApiGateway` synchronizes its local cache against:
+
+```text
+GET /water/internal/serviceregistration/available
 ```
 
-## Dependencies
+So the gateway consumes the internal anonymous boundary, not the public authenticated CRUD API.
 
-- **Core-api** — Base interfaces and annotations
-- **Core-model** — `AbstractJpaEntity`, `ProtectedEntity`, `OwnedResource`
-- **Core-security** — `@AccessControl`, `@DefaultRoleAccess`
-- **Repository / JpaRepository** — Persistence layer
-- **Rest** — REST controller infrastructure
+## Reserved / inactive components
+
+The following types are part of the module's public API surface but are **not wired** to any production code path in v3.0.0. They exist as reserved extension points for a future distributed-configuration layer (e.g., ZooKeeper, etcd, Consul):
+
+- `ConfigManager` (API) — contract for a per-service configuration store
+- `ConfigChangeListener` (API) — callback for real-time config updates
+- `InMemoryConfigManager` (service) — default implementation registered as `@FrameworkComponent(priority = 0)` so a higher-priority backend can override it
+
+These types are intentionally kept even though no current code path invokes them; see the Javadocs on each type for the full rationale.
+
+## Testing
+
+- JUnit covers repository, service and system-layer behavior
+- REST boundaries are covered via Karate
+- Internal API behavior is validated separately from the public CRUD API

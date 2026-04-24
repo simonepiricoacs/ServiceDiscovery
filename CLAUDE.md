@@ -1,186 +1,141 @@
 # ServiceDiscovery Module — Microservice Registry
 
 ## Purpose
-Provides a **service registry** for Water Framework microservices. Services register themselves on startup (with metadata, health check config, and status), send heartbeats to remain active, and deregister on shutdown. Consumers (e.g., `ApiGateway`) query the registry to discover live instances and their endpoints.
+
+`ServiceDiscovery` is the Water runtime registry for service instances. Its job is narrow:
+
+- accept internal service registrations
+- keep liveness updated through heartbeat
+- expose the current `UP` instances to internal consumers
+- keep the public CRUD boundary separate from the internal infrastructure boundary
 
 ## Sub-modules
 
-| Sub-module | Runtime | Key Classes |
+| Sub-module | Runtime | Key classes |
 |---|---|---|
-| `ServiceDiscovery-api` | All | `ServiceRegistrationApi`, `ServiceRegistrationSystemApi`, `ServiceRegistrationRestApi`, `ServiceRegistrationRepository`, `ConfigManager`, `ConfigChangeListener` |
-| `ServiceDiscovery-model` | All | `ServiceRegistration`, `ServiceStatus` enum, `ServiceDiscoveryActions` |
-| `ServiceDiscovery-service` | Water/OSGi | Service impl, repository, REST controller, `InMemoryConfigManager` |
-| `ServiceDiscovery-service-spring` | Spring Boot | Spring MVC REST controllers, Spring Boot app config |
+| `ServiceDiscovery-api` | All | `ServiceRegistrationApi`, `ServiceRegistrationSystemApi`, repository and REST contracts |
+| `ServiceDiscovery-model` | All | `ServiceRegistration`, `ServiceStatus`, `ServiceDiscoveryActions` |
+| `ServiceDiscovery-service` | Water/OSGi | Repository, service/system layer, JAX-RS controllers, cleanup scheduler |
+| `ServiceDiscovery-service-spring` | Spring Boot | Spring MVC controllers and application wiring |
 
-## ServiceRegistration Entity
+## Security model
 
-```java
-@Entity
-@Table(name = "service_registration",
-       uniqueConstraints = @UniqueConstraint(columnNames = {"serviceName", "instanceId"}))
-@AccessControl(
-    availableActions = {CrudActions.class, ServiceDiscoveryActions.class},
-    rolesPermissions = {
-        @DefaultRoleAccess(roleName = "serviceDiscoveryManager",
-                           actions = {CrudActions.class, ServiceDiscoveryActions.class}),
-        @DefaultRoleAccess(roleName = "serviceDiscoveryViewer",
-                           actions = {CrudActions.FIND, CrudActions.FIND_ALL}),
-        @DefaultRoleAccess(roleName = "serviceDiscoveryOperator",
-                           actions = {ServiceDiscoveryActions.HEARTBEAT, CrudActions.FIND, CrudActions.FIND_ALL})
-    }
-)
-public class ServiceRegistration extends AbstractJpaEntity
-    implements ProtectedEntity, OwnedResource {
+`ServiceDiscoveryActions` currently defines only one service-specific action:
 
-    @NotNull @NoMalitiusCode
-    private String serviceName;           // logical service name (e.g., "user-service")
-
-    @NotNull @Column(unique = false)
-    private String instanceId;            // unique per instance (e.g., "user-service-1")
-
-    @NotNull @NoMalitiusCode
-    private String endpoint;              // base URL (e.g., "http://host:8080")
-
-    @NoMalitiusCode
-    private String protocol;              // "http" or "https"
-
-    @NoMalitiusCode
-    private String description;
-
-    @NoMalitiusCode
-    private String tags;                  // comma-separated tags for filtering
-
-    @Lob @NoMalitiusCode
-    private String metadata;              // JSON blob for extra metadata
-
-    private ServiceStatus status;         // enum: STARTING, UP, DOWN, OUT_OF_SERVICE
-
-    private Date lastHeartbeat;
-    private int healthCheckInterval;      // seconds
-    private String healthCheckEndpoint;   // e.g., "/actuator/health"
-
-    @Lob
-    private String configuration;         // JSON: service-specific runtime config
-
-    private long ownerUserId;
-}
-```
-
-## ServiceStatus Lifecycle
-
-```
-STARTING ──► UP ──► DOWN (health check fails)
-              │       │
-              │       └─► UP (health check recovers)
-              │
-              └─► OUT_OF_SERVICE (manual shutdown)
-```
-
-## ServiceDiscoveryActions (Custom)
 ```java
 public class ServiceDiscoveryActions {
-    public static final String HEARTBEAT  = "HEARTBEAT";   // bitmask: 32
-    public static final String PROMOTE    = "PROMOTE";     // bitmask: 64 (UP/DOWN transition)
-    public static final String CONFIGURE  = "CONFIGURE";   // bitmask: 128 (update configuration)
+    public static final String HEALTH_CHECK = "health_check";
 }
 ```
 
-## Key Interfaces
+Default roles:
 
-### ServiceRegistrationApi / SystemApi
-```java
-ServiceRegistration save(ServiceRegistration reg);       // register service
-ServiceRegistration update(ServiceRegistration reg);     // update registration
-ServiceRegistration find(long id);
-ServiceRegistration findByNameAndInstance(String serviceName, String instanceId);
-List<ServiceRegistration> findByServiceName(String serviceName); // all instances
-List<ServiceRegistration> findByStatus(ServiceStatus status);    // active services
-PaginatedResult<ServiceRegistration> findAll(int delta, int page, Query filter);
-void remove(long id);                                    // deregister
-
-// Heartbeat
-void heartbeat(String serviceName, String instanceId);  // update lastHeartbeat + set UP
-
-// Health management
-void cleanup(int staleThresholdSeconds);                // set DOWN if no heartbeat
-```
-
-### ConfigManager
-Manages runtime configuration distributed to registered services:
-
-```java
-public interface ConfigManager {
-    void setConfig(String serviceName, String key, String value);
-    String getConfig(String serviceName, String key);
-    Map<String, String> getAllConfig(String serviceName);
-    void addChangeListener(String serviceName, ConfigChangeListener listener);
-}
-```
-
-`InMemoryConfigManager` is the default implementation — suitable for single-node deployments. Replace with ZooKeeper-backed implementation for distributed config.
-
-## Service Registration Pattern (Client Side)
-
-```java
-// In your microservice's @OnActivate or @PostConstruct
-ServiceRegistration reg = new ServiceRegistration();
-reg.setServiceName("my-service");
-reg.setInstanceId("my-service-" + UUID.randomUUID());
-reg.setEndpoint("http://" + hostname + ":" + port);
-reg.setProtocol("http");
-reg.setStatus(ServiceStatus.STARTING);
-reg.setHealthCheckEndpoint("/actuator/health");
-reg.setHealthCheckInterval(30);
-
-ServiceRegistration saved = serviceRegistrationApi.save(reg);
-
-// Start heartbeat (every 25 seconds)
-scheduler.scheduleAtFixedRate(() ->
-    serviceRegistrationApi.heartbeat("my-service", reg.getInstanceId()),
-    0, 25, TimeUnit.SECONDS);
-
-// On shutdown (@OnDeactivate / @PreDestroy)
-serviceRegistrationApi.remove(saved.getId());
-```
-
-## REST Endpoints
-
-| Method | Path | Permission |
-|---|---|---|
-| `POST` | `/water/serviceregistrations` | serviceDiscoveryManager |
-| `PUT` | `/water/serviceregistrations` | serviceDiscoveryManager |
-| `GET` | `/water/serviceregistrations/{id}` | serviceDiscoveryViewer |
-| `GET` | `/water/serviceregistrations` | serviceDiscoveryViewer |
-| `DELETE` | `/water/serviceregistrations/{id}` | serviceDiscoveryManager |
-| `PUT` | `/water/serviceregistrations/heartbeat/{name}/{instance}` | serviceDiscoveryOperator |
-| `GET` | `/water/serviceregistrations/byName/{serviceName}` | serviceDiscoveryViewer |
-
-## Default Roles
-
-| Role | Allowed Actions |
+| Role | Allowed actions |
 |---|---|
-| `serviceDiscoveryManager` | Full CRUD + heartbeat + promote + configure |
-| `serviceDiscoveryViewer` | FIND, FIND_ALL |
-| `serviceDiscoveryOperator` | HEARTBEAT, FIND, FIND_ALL |
+| `serviceDiscoveryManager` | `save`, `update`, `find`, `find_all`, `remove`, `health_check` |
+| `serviceDiscoveryViewer` | `find`, `find_all` |
+| `serviceDiscoveryOperator` | `find`, `find_all`, `update`, `health_check` |
 
-## Dependencies
-- `it.water.repository.jpa:JpaRepository-api` — `AbstractJpaEntity`
-- `it.water.core:Core-permission` — `@AccessControl`, `CrudActions`
-- `it.water.rest:Rest-persistence` — `BaseEntityRestApi`
+## ServiceRegistration model
+
+The logical identity of a registration is:
+
+- `serviceName`
+- `instanceId`
+
+Operationally important fields:
+
+- `endpoint`
+- `protocol`
+- `status`
+- `lastHeartbeat`
+- `healthCheckInterval`
+- `healthCheckEndpoint`
+
+Two fields are intentionally kept as reserved extension points:
+
+- `metadata`
+- `configuration`
+
+They are persisted and exposed by the REST contract, but the current registry logic does not interpret them.
+
+## REST boundaries
+
+### Public authenticated API
+
+Base path:
+
+```text
+/water/api/serviceregistration
+```
+
+This is the JWT-protected CRUD boundary.
+
+### Internal anonymous API
+
+Base path:
+
+```text
+/water/internal/serviceregistration
+```
+
+This is the infrastructure boundary used by microservices and `ApiGateway`.
+
+Internal endpoints:
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/water/internal/serviceregistration/register` | Self-registration |
+| `GET` | `/water/internal/serviceregistration/available` | Read only `UP` instances |
+| `DELETE` | `/water/internal/serviceregistration/{serviceName}/{instanceId}` | Deregistration by logical key |
+| `PUT` | `/water/internal/serviceregistration/heartbeat/{serviceName}/{instanceId}` | Heartbeat refresh |
+
+## System-layer semantics
+
+The authoritative runtime behavior lives in `ServiceRegistrationSystemApi` / `ServiceRegistrationSystemServiceImpl`.
+
+Important rules:
+
+- heartbeat on a missing registration returns `404` from the internal REST boundary
+- `available` returns only registrations currently marked `UP`
+- cleanup removes stale registrations from the healthy set
+- deregistration and heartbeat operate on the logical key `serviceName + instanceId`, not only on DB ids
+
+## Repository notes
+
+`ServiceRegistrationRepositoryImpl` uses QueryBuilder for lookups and JPQL bulk updates for atomic state transitions.
+
+This is intentional:
+
+- QueryBuilder for read-side filters
+- JPQL `update` / `delete` for bulk transitions such as heartbeat and status updates
 
 ## Integration with ApiGateway
-The `ApiGateway` module's `ServiceDiscoveryClientImpl` queries:
-```
-GET /water/serviceregistrations/byName/{serviceName}
-```
-and load-balances across returned `UP` instances.
 
-## Testing
-- Unit tests: `WaterTestExtension` — test registration lifecycle, heartbeat, cleanup
-- REST tests: **Karate only** — never JUnit direct calls to `ServiceRegistrationRestController`
+`ApiGateway` syncs against:
 
-## Code Generation Rules
-- `ServiceRegistrationRestController` tested **exclusively via Karate**
-- Use `ServiceStatus.UP` check when resolving service instances — never forward to `DOWN` or `OUT_OF_SERVICE` instances
-- `configuration` field is a JSON blob — use `ObjectMapper` to serialize/deserialize, not raw string manipulation
-- `cleanup()` is a scheduled system operation — call via `SystemApi`, not `Api` (no permission context available in scheduler threads)
+```text
+GET /water/internal/serviceregistration/available
+```
+
+So the gateway uses the internal anonymous boundary, not the public authenticated CRUD API.
+
+## Reserved / inactive components
+
+The following types are part of the module's public API surface but are **not wired** to any production code path in v3.0.0. They are kept as reserved extension points for a future distributed-configuration layer (ZooKeeper, etcd, Consul, …):
+
+- `it.water.service.discovery.api.ConfigManager` — contract for a per-service configuration store (save / load / delete / watch)
+- `it.water.service.discovery.api.ConfigChangeListener` — functional callback for real-time config updates
+- `it.water.service.discovery.service.InMemoryConfigManager` — default `@FrameworkComponent(priority = 0)` implementation, so a higher-priority backend can override it without code changes
+
+Rules:
+
+- do **not** `@Inject` or call these types from new code until the subsystem is reactivated
+- do **not** remove them: they are the public hook point for a pluggable config backend
+- when the subsystem is reactivated, remove the "reserved" note from the Javadocs and update this section
+
+## Testing guidance
+
+- repository/service/system behavior: JUnit
+- REST boundaries: Karate
+- do not add direct controller JUnit tests for the REST layer

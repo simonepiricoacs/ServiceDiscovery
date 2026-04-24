@@ -27,6 +27,15 @@ public interface ServiceRegistrationRepository extends BaseRepository<ServiceReg
     ServiceRegistration findByServiceNameAndInstanceId(String serviceName, String instanceId);
 
     /**
+     * Removes a service registration by logical key using a single repository operation.
+     *
+     * @param serviceName the logical service name
+     * @param instanceId the runtime instance id
+     * @return true if a row was removed, false otherwise
+     */
+    boolean removeByServiceNameAndInstanceId(String serviceName, String instanceId);
+
+    /**
      * Finds all instances of a service by its name.
      *
      * @param serviceName the name of the service
@@ -60,6 +69,15 @@ public interface ServiceRegistrationRepository extends BaseRepository<ServiceReg
     List<ServiceRegistration> findByLastHeartbeatBefore(Date date);
 
     /**
+     * Finds services whose last heartbeat is before the specified date and whose status differs from the excluded one.
+     *
+     * @param date the threshold date
+     * @param excludedStatus the status to exclude from results
+     * @return list of matching services
+     */
+    List<ServiceRegistration> findByLastHeartbeatBeforeAndStatusNot(Date date, ServiceStatus excludedStatus);
+
+    /**
      * Updates the heartbeat timestamp for a service instance.
      *
      * @param serviceName the name of the service
@@ -67,6 +85,17 @@ public interface ServiceRegistrationRepository extends BaseRepository<ServiceReg
      * @param heartbeat the new heartbeat timestamp
      */
     void updateHeartbeat(String serviceName, String instanceId, Date heartbeat);
+
+    /**
+     * Updates heartbeat and status in a single repository operation.
+     *
+     * @param serviceName the name of the service
+     * @param instanceId the unique instance identifier
+     * @param heartbeat the new heartbeat timestamp
+     * @param status the status to set
+     * @return true if a row was updated, false otherwise
+     */
+    boolean updateHeartbeatAndStatus(String serviceName, String instanceId, Date heartbeat, ServiceStatus status);
 
     /**
      * Updates the status of a service instance.

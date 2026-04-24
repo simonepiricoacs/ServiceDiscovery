@@ -6,6 +6,7 @@ import it.water.repository.entity.model.exceptions.NoResultException;
 import it.water.repository.jpa.WaterJpaRepositoryImpl;
 import it.water.service.discovery.api.*;
 import it.water.service.discovery.model.*;
+import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,6 +45,22 @@ public class ServiceRegistrationRepositoryImpl extends WaterJpaRepositoryImpl<Se
     }
 
     @Override
+    public boolean removeByServiceNameAndInstanceId(String serviceName, String instanceId) {
+        logger.debug("Removing service registration by serviceName: {} and instanceId: {}", serviceName, instanceId);
+        Integer deleted = tx(Transactional.TxType.REQUIRED, entityManager -> {
+            Integer affected = entityManager.createQuery(
+                            "delete from ServiceRegistration s where s.serviceName = :serviceName and s.instanceId = :instanceId")
+                    .setParameter("serviceName", serviceName)
+                    .setParameter("instanceId", instanceId)
+                    .executeUpdate();
+            entityManager.flush();
+            entityManager.clear();
+            return affected;
+        });
+        return deleted != null && deleted > 0;
+    }
+
+    @Override
     public List<ServiceRegistration> findByServiceName(String serviceName) {
         logger.debug("Finding all service registrations by serviceName: {}", serviceName);
         // Water Framework pattern: Use QueryBuilder for all queries
@@ -55,8 +72,8 @@ public class ServiceRegistrationRepositoryImpl extends WaterJpaRepositoryImpl<Se
     @Override
     public List<ServiceRegistration> findByStatus(ServiceStatus status) {
         logger.debug("Finding all service registrations by status: {}", status);
-        // Water Framework pattern: Use QueryBuilder with string filter for enum types
-        Query query = getQueryBuilderInstance().createQueryFilter("status='" + status.name() + "'");
+        Query query = getQueryBuilderInstance()
+            .field("status").equalTo(status);
         return findAll(-1, 1, query, null).getResults().stream().toList();
     }
 
@@ -80,28 +97,67 @@ public class ServiceRegistrationRepositoryImpl extends WaterJpaRepositoryImpl<Se
     }
 
     @Override
+    public List<ServiceRegistration> findByLastHeartbeatBeforeAndStatusNot(Date date, ServiceStatus excludedStatus) {
+        logger.debug("Finding all service registrations with lastHeartbeat before: {} and status different from: {}", date, excludedStatus);
+        Query query = getQueryBuilderInstance()
+            .field("lastHeartbeat").lowerThan(date)
+            .and(getQueryBuilderInstance().field("status").notEqualTo(excludedStatus));
+        return findAll(-1, 1, query, null).getResults().stream().toList();
+    }
+
+    @Override
     public void updateHeartbeat(String serviceName, String instanceId, Date heartbeat) {
         logger.debug("Updating heartbeat for serviceName: {} and instanceId: {} to: {}", serviceName, instanceId, heartbeat);
-        // Water Framework pattern: find-then-update
-        ServiceRegistration entity = findByServiceNameAndInstanceId(serviceName, instanceId);
-        if (entity != null) {
-            entity.setLastHeartbeat(heartbeat);
-            update(entity);
-        } else {
+        Integer updated = tx(Transactional.TxType.REQUIRED, entityManager -> {
+            Integer affected = entityManager.createQuery(
+                            "update ServiceRegistration s set s.lastHeartbeat = :heartbeat where s.serviceName = :serviceName and s.instanceId = :instanceId")
+                    .setParameter("heartbeat", heartbeat)
+                    .setParameter("serviceName", serviceName)
+                    .setParameter("instanceId", instanceId)
+                    .executeUpdate();
+            entityManager.flush();
+            entityManager.clear();
+            return affected;
+        });
+        if (updated == null || updated == 0) {
             logger.warn("No service registration found for serviceName: {} and instanceId: {}", serviceName, instanceId);
         }
     }
 
     @Override
+    public boolean updateHeartbeatAndStatus(String serviceName, String instanceId, Date heartbeat, ServiceStatus status) {
+        logger.debug("Updating heartbeat and status for serviceName: {} and instanceId: {} to heartbeat={} status={}", serviceName, instanceId, heartbeat, status);
+        Integer updated = tx(Transactional.TxType.REQUIRED, entityManager -> {
+            Integer affected = entityManager.createQuery(
+                            "update ServiceRegistration s set s.lastHeartbeat = :heartbeat, s.status = :status where s.serviceName = :serviceName and s.instanceId = :instanceId")
+                    .setParameter("heartbeat", heartbeat)
+                    .setParameter("status", status)
+                    .setParameter("serviceName", serviceName)
+                    .setParameter("instanceId", instanceId)
+                    .executeUpdate();
+            entityManager.flush();
+            entityManager.clear();
+            return affected;
+        });
+        return updated != null && updated > 0;
+    }
+
+    @Override
     public void updateStatus(String serviceName, String instanceId, ServiceStatus status) {
         logger.debug("Updating status for serviceName: {} and instanceId: {} to: {}", serviceName, instanceId, status);
-        // Water Framework pattern: find-then-update
-        ServiceRegistration entity = findByServiceNameAndInstanceId(serviceName, instanceId);
-        if (entity != null) {
-            entity.setStatus(status);
-            update(entity);
-        } else {
-            logger.warn("No service registration found for serviceName: {} and instanceId: {}", serviceName, instanceId);
+        Integer updated = tx(Transactional.TxType.REQUIRED, entityManager -> {
+            Integer affected = entityManager.createQuery(
+                            "update ServiceRegistration s set s.status = :status where s.serviceName = :serviceName and s.instanceId = :instanceId")
+                    .setParameter("status", status)
+                    .setParameter("serviceName", serviceName)
+                    .setParameter("instanceId", instanceId)
+                    .executeUpdate();
+            entityManager.flush();
+            entityManager.clear();
+            return affected;
+        });
+        if (updated == null || updated == 0) {
+            logger.debug("No status transition needed for serviceName: {} and instanceId: {}", serviceName, instanceId);
         }
     }
 }

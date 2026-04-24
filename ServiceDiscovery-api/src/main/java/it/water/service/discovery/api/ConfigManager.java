@@ -3,11 +3,25 @@ package it.water.service.discovery.api;
 import java.util.Map;
 
 /**
- * Interface for managing service configurations.
- * Allows multiple implementations: in-memory, Zookeeper, etcd, Consul, etc.
+ * Contract for a per-service configuration store (save / load / delete / watch).
  *
- * Implementations should be registered as Water Framework components
- * with appropriate priority levels to control injection preference.
+ * <p><b>Reserved extension point — not active in v3.0.0.</b> The default
+ * implementation {@code it.water.service.discovery.service.InMemoryConfigManager}
+ * is registered in the Water runtime but no production code path currently invokes
+ * this API: the ServiceDiscovery registry persists {@code ServiceRegistration}
+ * instances and relies on internal REST endpoints for liveness, while runtime
+ * configuration distribution is intentionally deferred.
+ *
+ * <p>The contract is kept in the public API so alternative backends (ZooKeeper,
+ * etcd, Consul) can be plugged in later via `@FrameworkComponent` priority
+ * overrides without breaking callers. Removing it would be a breaking API
+ * change for clients that may already depend on the type.
+ *
+ * <p>Do NOT inject or call these methods from new code until the
+ * distributed-configuration layer is reactivated. In particular, the current
+ * heartbeat/liveness flow does not read or write configuration through this
+ * API: liveness is handled by internal ServiceDiscovery REST endpoints and the
+ * cleanup scheduler.
  */
 public interface ConfigManager {
 
@@ -47,7 +61,7 @@ public interface ConfigManager {
 
     /**
      * Registers a listener to be notified when configuration changes.
-     * Useful for implementations that support real-time updates (e.g., Zookeeper).
+     * Useful for implementations that support real-time updates (e.g., ZooKeeper).
      *
      * @param serviceName the name of the service to watch
      * @param listener the listener to notify on configuration changes

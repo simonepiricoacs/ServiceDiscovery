@@ -32,9 +32,9 @@ dependencies {
 }
 
 publishing {
-    	publications {
-        	hyperiot(MavenPublication) {
-            	from components.java
+    publications {
+        water(MavenPublication) {
+            from components.java
         }
     }
- }
+}

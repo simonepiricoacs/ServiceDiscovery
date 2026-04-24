@@ -1,9 +1,13 @@
 package it.water.service.discovery.api;
 
 /**
- * Functional interface for listening to configuration changes.
- * Implementations can react to configuration updates pushed by
- * ConfigManager implementations that support watching (e.g., Zookeeper).
+ * Callback interface for implementations of {@link ConfigManager} that support
+ * real-time configuration updates (for example, backed by ZooKeeper watchers).
+ *
+ * <p><b>Reserved extension point — not active in v3.0.0.</b> Kept for forward
+ * compatibility alongside {@link ConfigManager}: see that type's Javadoc for
+ * the full rationale. No production code path currently registers listeners
+ * through this interface.
  */
 @FunctionalInterface
 public interface ConfigChangeListener {

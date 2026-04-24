@@ -25,7 +25,7 @@ import java.util.Set;
  * ServiceRegistration Entity Class.
  * <p>
  * Represents a service registered in the Service Discovery system.
- * Tracks service metadata, health status, and configuration.
+ * Tracks service identity, health status, and reserved extension payloads.
  */
 @Entity
 @Table(name = "service_registration",
@@ -153,6 +153,8 @@ public class ServiceRegistration extends AbstractJpaEntity implements ProtectedE
     @Column(name = "metadata_value", length = 1000)
     @Setter
     @JsonView(WaterJsonView.Extended.class)
+    // Reserved extension point: persisted and exposed, but not interpreted by
+    // the core registry logic.
     private Map<String, String> metadata;
 
     // ========== Health & Lifecycle ==========
@@ -186,6 +188,8 @@ public class ServiceRegistration extends AbstractJpaEntity implements ProtectedE
     @Column(length = 10000)
     @Setter
     @JsonView(WaterJsonView.Extended.class)
+    // Reserved extension point for future runtime-specific payloads. Kept as
+    // part of the REST/entity contract even if the current module does not use it.
     private String configuration;
 
     // ========== Owned Resource ==========

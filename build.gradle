@@ -5,7 +5,9 @@ plugins {
 allprojects {
     project.ext.publishRepoName = "public-water-repository"
     project.ext.publishRepoUrl =  "https://nexus.acsoftware.it/nexus/repository/maven-water/"
-    
+    project.ext.publishRepoUsername = System.getProperty("publishRepoUsername", "noUser")
+    project.ext.publishRepoPassword = System.getProperty("publishRepoPassword", "noPassword")
+
     project.ext.ServiceDiscoveryVersion = project.waterVersion
     group 'it.water.service.discovery'
 	version project.ServiceDiscoveryVersion
@@ -29,6 +31,10 @@ allprojects {
 			maven {
                 name = project.publishRepoName
 				url = project.publishRepoUrl
+				credentials {
+					username project.publishRepoUsername
+					password project.publishRepoPassword
+				}
 			}
 		}
 	}

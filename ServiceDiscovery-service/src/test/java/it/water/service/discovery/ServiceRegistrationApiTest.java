@@ -83,6 +83,10 @@ class ServiceRegistrationApiTest implements Service {
 
     @BeforeAll
     void beforeAll() {
+        //cleanup any entities left by other test classes (e.g. Karate)
+        TestRuntimeUtils.impersonateAdmin(componentRegistry);
+        PaginableResult<ServiceRegistration> existing = this.serviceRegistrationApi.findAll(null, -1, -1, null);
+        existing.getResults().forEach(entity -> this.serviceRegistrationApi.remove(entity.getId()));
         //getting user
         serviceregistrationManagerRole = roleManager.getRole(ServiceRegistration.DEFAULT_MANAGER_ROLE);
         serviceregistrationViewerRole = roleManager.getRole(ServiceRegistration.DEFAULT_VIEWER_ROLE);
@@ -454,6 +458,12 @@ class ServiceRegistrationApiTest implements Service {
 
     @Order(23)
     @Test
+    void systemApiUpdateHeartbeatInternalShouldReturnFalseWhenMissing() {
+        Assertions.assertFalse(serviceRegistrationSystemApi.updateHeartbeatInternal("missing-service", "missing-instance"));
+    }
+
+    @Order(24)
+    @Test
     void batchHealthCheckShouldReturnServiceStatuses() {
         Map<String, ServiceStatus> statuses = serviceRegistrationSystemApi.performBatchHealthCheck();
         Assertions.assertNotNull(statuses);
@@ -463,7 +473,7 @@ class ServiceRegistrationApiTest implements Service {
 
     // ========== NEW TESTS: Integration Tests for Service Lifecycle ==========
 
-    @Order(24)
+    @Order(25)
     @Test
     void serviceLifecycleIntegrationTest() {
         TestRuntimeUtils.impersonateAdmin(componentRegistry);
@@ -491,7 +501,7 @@ class ServiceRegistrationApiTest implements Service {
         Assertions.assertNull(deleted);
     }
 
-    @Order(25)
+    @Order(26)
     @Test
     void multipleInstancesOfSameServiceShouldCoexist() {
         TestRuntimeUtils.impersonateAdmin(componentRegistry);
@@ -511,61 +521,18 @@ class ServiceRegistrationApiTest implements Service {
         Assertions.assertEquals(2, instances.size());
     }
 
-    // ========== NEW TESTS: ConfigManager ==========
-
-    @Inject
-    @Setter
-    private ConfigManager configManager;
-
-    @Order(26)
-    @Test
-    void configManagerSaveAndLoadShouldWork() {
-        String config = "{\"timeout\": 30, \"retries\": 3}";
-        configManager.saveConfiguration("config-test-service", "config-instance-1", config);
-
-        String loaded = configManager.loadConfiguration("config-test-service", "config-instance-1");
-        Assertions.assertEquals(config, loaded);
-    }
-
     @Order(27)
     @Test
-    void configManagerDeleteShouldWork() {
-        String config = "{\"test\": \"value\"}";
-        configManager.saveConfiguration("delete-service", "delete-instance", config);
-        Assertions.assertTrue(configManager.configurationExists("delete-service", "delete-instance"));
+    void deregisterByKeyShouldBeIdempotent() {
+        TestRuntimeUtils.impersonateAdmin(componentRegistry);
+        ServiceRegistration service = createServiceRegistration(1201);
+        service.setServiceName("idempotent-service");
+        service.setInstanceId("idempotent-instance");
+        serviceRegistrationApi.save(service);
 
-        configManager.deleteConfiguration("delete-service", "delete-instance");
-        Assertions.assertFalse(configManager.configurationExists("delete-service", "delete-instance"));
-    }
-
-    @Order(28)
-    @Test
-    void configManagerLoadServiceConfigurationsShouldWork() {
-        configManager.saveConfiguration("multi-config-service", "instance-1", "{\"port\": 8080}");
-        configManager.saveConfiguration("multi-config-service", "instance-2", "{\"port\": 8081}");
-
-        Map<String, String> configs = configManager.loadServiceConfigurations("multi-config-service");
-        Assertions.assertEquals(2, configs.size());
-        Assertions.assertTrue(configs.containsKey("instance-1"));
-        Assertions.assertTrue(configs.containsKey("instance-2"));
-    }
-
-    @Order(29)
-    @Test
-    void configManagerChangeListenerShouldBeNotified() {
-        final String[] notifiedConfig = new String[1];
-        final boolean[] listenerCalled = {false};
-
-        ConfigChangeListener listener = (serviceName, instanceId, configuration) -> {
-            notifiedConfig[0] = configuration;
-            listenerCalled[0] = true;
-        };
-
-        configManager.registerConfigurationChangeListener("listener-service", listener);
-        configManager.saveConfiguration("listener-service", "listener-instance", "{\"notified\": true}");
-
-        Assertions.assertTrue(listenerCalled[0]);
-        Assertions.assertEquals("{\"notified\": true}", notifiedConfig[0]);
+        Assertions.assertDoesNotThrow(() -> serviceRegistrationSystemApi.deregisterByKey("idempotent-service", "idempotent-instance"));
+        Assertions.assertDoesNotThrow(() -> serviceRegistrationSystemApi.deregisterByKey("idempotent-service", "idempotent-instance"));
+        Assertions.assertNull(serviceRegistrationRepository.findByServiceNameAndInstanceId("idempotent-service", "idempotent-instance"));
     }
 
     private ServiceRegistration createServiceRegistration(int seed) {

@@ -12,7 +12,7 @@
 			"projectVersion": "project.waterVersion",
 			"projectTechnology": "water",
 			"hasRestServices": true,
-			"restContextRoot": "/api/servicediscovery",
+			"restContextRoot": "/api/serviceregistration",
 			"hasModel": true,
 			"modelName": "ServiceRegistration",
 			"modelNameLowerCase": "serviceRegistration",
@@ -42,9 +42,9 @@
 			"serviceRestPackage": "it.water.service.discovery.service.rest",
 			"testPackage": "it.water.service.discovery",
 			"publishModule": true,
-			"publishRepoName": "My Repository",
-			"publishRepoUrl": "https://myrepo/m2",
-			"publishRepoHasCredentials": false,
+			"publishRepoName": "public-water-repository",
+			"publishRepoUrl": "https://nexus.acsoftware.it/nexus/repository/maven-water/",
+			"publishRepoHasCredentials": true,
 			"entities": [
 						{
 									"modelName": "ServiceRegistration",

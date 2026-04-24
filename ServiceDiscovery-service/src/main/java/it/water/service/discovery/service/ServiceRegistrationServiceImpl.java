@@ -9,7 +9,6 @@ import it.water.repository.service.BaseEntityServiceImpl;
 import lombok.*;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 
 /**
@@ -42,22 +41,13 @@ public class ServiceRegistrationServiceImpl extends BaseEntityServiceImpl<Servic
     @Override
     public ServiceRegistration register(ServiceRegistration service) {
         getLog().debug("Registering service: {}", service.getServiceName());
-        // Set initial values - registrationTime is handled by @PrePersist in the entity
-        service.setLastHeartbeat(new Date());
-        service.setStatus(ServiceStatus.UP);
-        if (service.getInstanceId() == null) {
-            service.setInstanceId(UUID.randomUUID().toString());
-        }
-        return systemService.save(service);
+        return systemService.registerInternal(service);
     }
 
     @Override
     public void deregister(String serviceName, String instanceId) {
         getLog().debug("Deregistering service: {} instance: {}", serviceName, instanceId);
-        ServiceRegistration service = repository.findByServiceNameAndInstanceId(serviceName, instanceId);
-        if (service != null) {
-            systemService.remove(service.getId());
-        }
+        systemService.deregisterByKey(serviceName, instanceId);
     }
 
     @Override
@@ -95,9 +85,7 @@ public class ServiceRegistrationServiceImpl extends BaseEntityServiceImpl<Servic
     @Override
     public void updateHeartbeat(String serviceName, String instanceId) {
         getLog().debug("Updating heartbeat for service: {} instance: {}", serviceName, instanceId);
-        repository.updateHeartbeat(serviceName, instanceId, new Date());
-        // Also update status to UP if it was different
-        repository.updateStatus(serviceName, instanceId, ServiceStatus.UP);
+        systemService.updateHeartbeatInternal(serviceName, instanceId);
     }
 
     @Override
