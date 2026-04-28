@@ -97,6 +97,9 @@ waterDescriptor {
     moduleId    = 'it.water.service.discovery'
     displayName = 'Service Discovery'
     description = 'Service registry and discovery for Water Framework microservice mesh'
+    componentsPackage = 'it.water.service.discovery.service'
+    repositoryPackage = 'it.water.service.discovery.repository'
+    entitiesPackage   = 'it.water.service.discovery.model'
 
     output {
         standardPin 'jdbc'
