@@ -31,7 +31,7 @@ import org.springframework.web.bind.annotation.*;
  * Interface exposing same methods of its parent ServiceRegistrationRestApi but adding Spring annotations.
  * Swagger annotation should be found because they have been defined in the parent ServiceRegistrationRestApi.
  */
-@RequestMapping("/api/serviceregistration")
+@RequestMapping("/serviceregistration")
 @FrameworkRestApi
 public interface ServiceRegistrationSpringRestApi extends ServiceRegistrationRestApi {
     @LoggedIn

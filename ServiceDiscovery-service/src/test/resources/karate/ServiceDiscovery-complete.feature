@@ -9,7 +9,7 @@ Feature: Complete ServiceDiscovery REST API Tests
   # ========================================
 
   Scenario: Create a new ServiceRegistration
-    Given url serviceBaseUrl + '/water/api/serviceregistration'
+    Given url serviceBaseUrl + '/water/serviceregistration'
     And header Content-Type = 'application/json'
     And header Accept = 'application/json'
     And request
@@ -34,9 +34,13 @@ Feature: Complete ServiceDiscovery REST API Tests
     And match response.entityVersion == 1
     * def serviceId = response.id
 
+    Given url serviceBaseUrl + '/water/serviceregistration/' + serviceId
+    When method DELETE
+    Then status 204
+
   Scenario: Update an existing ServiceRegistration
     # First create a service
-    Given url serviceBaseUrl + '/water/api/serviceregistration'
+    Given url serviceBaseUrl + '/water/serviceregistration'
     And header Content-Type = 'application/json'
     And request
       """
@@ -55,7 +59,7 @@ Feature: Complete ServiceDiscovery REST API Tests
     * def serviceId = createdService.id
 
     # Now update it
-    Given url serviceBaseUrl + '/water/api/serviceregistration'
+    Given url serviceBaseUrl + '/water/serviceregistration'
     And header Content-Type = 'application/json'
     And request
       """
@@ -77,9 +81,13 @@ Feature: Complete ServiceDiscovery REST API Tests
     And match response.protocol == 'https'
     And match response.entityVersion == 2
 
+    Given url serviceBaseUrl + '/water/serviceregistration/' + serviceId
+    When method DELETE
+    Then status 204
+
   Scenario: Find ServiceRegistration by ID
     # First create a service
-    Given url serviceBaseUrl + '/water/api/serviceregistration'
+    Given url serviceBaseUrl + '/water/serviceregistration'
     And header Content-Type = 'application/json'
     And request
       """
@@ -97,7 +105,7 @@ Feature: Complete ServiceDiscovery REST API Tests
     * def serviceId = response.id
 
     # Now find it by ID
-    Given url serviceBaseUrl + '/water/api/serviceregistration/' + serviceId
+    Given url serviceBaseUrl + '/water/serviceregistration/' + serviceId
     And header Accept = 'application/json'
     When method GET
     Then status 200
@@ -105,9 +113,13 @@ Feature: Complete ServiceDiscovery REST API Tests
     And match response.serviceName == 'notification-service'
     And match response.instanceId == 'notif-001'
 
+    Given url serviceBaseUrl + '/water/serviceregistration/' + serviceId
+    When method DELETE
+    Then status 204
+
   Scenario: Find All ServiceRegistrations
     # Create multiple services
-    Given url serviceBaseUrl + '/water/api/serviceregistration'
+    Given url serviceBaseUrl + '/water/serviceregistration'
     And header Content-Type = 'application/json'
     And request
       """
@@ -122,8 +134,9 @@ Feature: Complete ServiceDiscovery REST API Tests
       """
     When method POST
     Then status 200
+    * def firstServiceId = response.id
 
-    Given url serviceBaseUrl + '/water/api/serviceregistration'
+    Given url serviceBaseUrl + '/water/serviceregistration'
     And header Content-Type = 'application/json'
     And request
       """
@@ -138,9 +151,10 @@ Feature: Complete ServiceDiscovery REST API Tests
       """
     When method POST
     Then status 200
+    * def secondServiceId = response.id
 
     # Now find all
-    Given url serviceBaseUrl + '/water/api/serviceregistration'
+    Given url serviceBaseUrl + '/water/serviceregistration'
     And header Accept = 'application/json'
     When method GET
     Then status 200
@@ -148,9 +162,17 @@ Feature: Complete ServiceDiscovery REST API Tests
     And assert response.results.length >= 2
     And match each response.results contains { serviceName: '#string', instanceId: '#string' }
 
+    Given url serviceBaseUrl + '/water/serviceregistration/' + firstServiceId
+    When method DELETE
+    Then status 204
+
+    Given url serviceBaseUrl + '/water/serviceregistration/' + secondServiceId
+    When method DELETE
+    Then status 204
+
   Scenario: Delete ServiceRegistration
     # First create a service
-    Given url serviceBaseUrl + '/water/api/serviceregistration'
+    Given url serviceBaseUrl + '/water/serviceregistration'
     And header Content-Type = 'application/json'
     And request
       """
@@ -168,12 +190,12 @@ Feature: Complete ServiceDiscovery REST API Tests
     * def serviceId = response.id
 
     # Now delete it
-    Given url serviceBaseUrl + '/water/api/serviceregistration/' + serviceId
+    Given url serviceBaseUrl + '/water/serviceregistration/' + serviceId
     When method DELETE
     Then status 204
 
     # Verify it's deleted
-    Given url serviceBaseUrl + '/water/api/serviceregistration/' + serviceId
+    Given url serviceBaseUrl + '/water/serviceregistration/' + serviceId
     When method GET
     Then status 404
 
@@ -182,7 +204,7 @@ Feature: Complete ServiceDiscovery REST API Tests
   # ========================================
 
   Scenario: Create ServiceRegistration with missing required fields should fail
-    Given url serviceBaseUrl + '/water/api/serviceregistration'
+    Given url serviceBaseUrl + '/water/serviceregistration'
     And header Content-Type = 'application/json'
     And request
       """
@@ -195,7 +217,7 @@ Feature: Complete ServiceDiscovery REST API Tests
 
   Scenario: Create duplicate ServiceRegistration should fail
     # Create first service
-    Given url serviceBaseUrl + '/water/api/serviceregistration'
+    Given url serviceBaseUrl + '/water/serviceregistration'
     And header Content-Type = 'application/json'
     And request
       """
@@ -210,9 +232,10 @@ Feature: Complete ServiceDiscovery REST API Tests
       """
     When method POST
     Then status 200
+    * def duplicateServiceId = response.id
 
     # Try to create duplicate (same serviceName + instanceId)
-    Given url serviceBaseUrl + '/water/api/serviceregistration'
+    Given url serviceBaseUrl + '/water/serviceregistration'
     And header Content-Type = 'application/json'
     And request
       """
@@ -227,6 +250,10 @@ Feature: Complete ServiceDiscovery REST API Tests
       """
     When method POST
     Then status 409
+
+    Given url serviceBaseUrl + '/water/serviceregistration/' + duplicateServiceId
+    When method DELETE
+    Then status 204
 
   # ========================================
   # AUTHORIZATION TESTS

@@ -61,6 +61,10 @@ Feature: Internal ServiceRegistration API
     }
     """
 
+    Given url serviceBaseUrl + '/water/internal/serviceregistration/' + serviceName + '/' + instanceId
+    When method DELETE
+    Then status 204
+
     Given url serviceBaseUrl + '/water/internal/serviceregistration'
     When method GET
     Then assert responseStatus == 404 || responseStatus == 405 || responseStatus == 500

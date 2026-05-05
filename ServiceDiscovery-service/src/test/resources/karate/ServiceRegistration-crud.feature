@@ -7,7 +7,7 @@ Feature: Check ServiceRegistration Rest Api Response
 
     Given header Content-Type = 'application/json'
     And header Accept = 'application/json'
-    Given url serviceBaseUrl+'/water/api/serviceregistration'
+    Given url serviceBaseUrl+'/water/serviceregistration'
     # ---- Add entity fields here -----
     And request
     """ {
@@ -52,7 +52,7 @@ Feature: Check ServiceRegistration Rest Api Response
 
     Given header Content-Type = 'application/json'
     And header Accept = 'application/json'
-    Given url serviceBaseUrl+'/water/api/serviceregistration'
+    Given url serviceBaseUrl+'/water/serviceregistration'
     # ---- Add entity fields here -----
     And request
     """ {
@@ -98,7 +98,7 @@ Feature: Check ServiceRegistration Rest Api Response
 
     Given header Content-Type = 'application/json'
     And header Accept = 'application/json'
-    Given url serviceBaseUrl+'/water/api/serviceregistration/'+entityId
+    Given url serviceBaseUrl+'/water/serviceregistration/'+entityId
     # ---------------------------------
     When method GET
     Then status 200
@@ -131,7 +131,7 @@ Feature: Check ServiceRegistration Rest Api Response
 
     Given header Content-Type = 'application/json'
     And header Accept = 'application/json'
-    Given url serviceBaseUrl+'/water/api/serviceregistration'
+    Given url serviceBaseUrl+'/water/serviceregistration'
     When method GET
     Then status 200
     And match response.results contains deep
@@ -147,7 +147,7 @@ Feature: Check ServiceRegistration Rest Api Response
 
     Given header Content-Type = 'application/json'
     And header Accept = 'application/json'
-    Given url serviceBaseUrl+'/water/api/serviceregistration/'+entityId
+    Given url serviceBaseUrl+'/water/serviceregistration/'+entityId
     When method DELETE
     # 204 because delete response is empty, so the status code is "no content" but is ok
     Then status 204

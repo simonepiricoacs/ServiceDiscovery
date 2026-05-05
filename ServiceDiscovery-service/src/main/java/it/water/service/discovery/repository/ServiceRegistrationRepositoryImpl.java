@@ -24,6 +24,9 @@ public class ServiceRegistrationRepositoryImpl extends WaterJpaRepositoryImpl<Se
 
     private static final Logger logger = LoggerFactory.getLogger(ServiceRegistrationRepositoryImpl.class);
     private static final String SERVICEREGISTRATION_PERSISTENCE_UNIT = "serviceRegistration-persistence-unit";
+    private static final String FIELD_SERVICE_NAME = "serviceName";
+    private static final String FIELD_INSTANCE_ID = "instanceId";
+    private static final String FIELD_STATUS = "status";
 
     public ServiceRegistrationRepositoryImpl() {
         super(ServiceRegistration.class, SERVICEREGISTRATION_PERSISTENCE_UNIT);
@@ -34,8 +37,8 @@ public class ServiceRegistrationRepositoryImpl extends WaterJpaRepositoryImpl<Se
         logger.debug("Finding service registration by serviceName: {} and instanceId: {}", serviceName, instanceId);
         // Water Framework pattern: Use QueryBuilder for all queries
         Query query = getQueryBuilderInstance()
-            .field("serviceName").equalTo(serviceName)
-            .and(getQueryBuilderInstance().field("instanceId").equalTo(instanceId));
+            .field(FIELD_SERVICE_NAME).equalTo(serviceName)
+            .and(getQueryBuilderInstance().field(FIELD_INSTANCE_ID).equalTo(instanceId));
         try {
             return find(query);
         } catch (NoResultException e) {
@@ -48,10 +51,10 @@ public class ServiceRegistrationRepositoryImpl extends WaterJpaRepositoryImpl<Se
     public boolean removeByServiceNameAndInstanceId(String serviceName, String instanceId) {
         logger.debug("Removing service registration by serviceName: {} and instanceId: {}", serviceName, instanceId);
         Integer deleted = tx(Transactional.TxType.REQUIRED, entityManager -> {
-            Integer affected = entityManager.createQuery(
-                            "delete from ServiceRegistration s where s.serviceName = :serviceName and s.instanceId = :instanceId")
-                    .setParameter("serviceName", serviceName)
-                    .setParameter("instanceId", instanceId)
+                    Integer affected = entityManager.createQuery(
+                                    "delete from ServiceRegistration s where s.serviceName = :serviceName and s.instanceId = :instanceId")
+                    .setParameter(FIELD_SERVICE_NAME, serviceName)
+                    .setParameter(FIELD_INSTANCE_ID, instanceId)
                     .executeUpdate();
             entityManager.flush();
             entityManager.clear();
@@ -65,7 +68,7 @@ public class ServiceRegistrationRepositoryImpl extends WaterJpaRepositoryImpl<Se
         logger.debug("Finding all service registrations by serviceName: {}", serviceName);
         // Water Framework pattern: Use QueryBuilder for all queries
         Query query = getQueryBuilderInstance()
-            .field("serviceName").equalTo(serviceName);
+            .field(FIELD_SERVICE_NAME).equalTo(serviceName);
         return findAll(-1, 1, query, null).getResults().stream().toList();
     }
 
@@ -73,7 +76,7 @@ public class ServiceRegistrationRepositoryImpl extends WaterJpaRepositoryImpl<Se
     public List<ServiceRegistration> findByStatus(ServiceStatus status) {
         logger.debug("Finding all service registrations by status: {}", status);
         Query query = getQueryBuilderInstance()
-            .field("status").equalTo(status);
+            .field(FIELD_STATUS).equalTo(status);
         return findAll(-1, 1, query, null).getResults().stream().toList();
     }
 
@@ -101,7 +104,7 @@ public class ServiceRegistrationRepositoryImpl extends WaterJpaRepositoryImpl<Se
         logger.debug("Finding all service registrations with lastHeartbeat before: {} and status different from: {}", date, excludedStatus);
         Query query = getQueryBuilderInstance()
             .field("lastHeartbeat").lowerThan(date)
-            .and(getQueryBuilderInstance().field("status").notEqualTo(excludedStatus));
+            .and(getQueryBuilderInstance().field(FIELD_STATUS).notEqualTo(excludedStatus));
         return findAll(-1, 1, query, null).getResults().stream().toList();
     }
 
@@ -109,11 +112,11 @@ public class ServiceRegistrationRepositoryImpl extends WaterJpaRepositoryImpl<Se
     public void updateHeartbeat(String serviceName, String instanceId, Date heartbeat) {
         logger.debug("Updating heartbeat for serviceName: {} and instanceId: {} to: {}", serviceName, instanceId, heartbeat);
         Integer updated = tx(Transactional.TxType.REQUIRED, entityManager -> {
-            Integer affected = entityManager.createQuery(
-                            "update ServiceRegistration s set s.lastHeartbeat = :heartbeat where s.serviceName = :serviceName and s.instanceId = :instanceId")
+                    Integer affected = entityManager.createQuery(
+                                    "update ServiceRegistration s set s.lastHeartbeat = :heartbeat where s.serviceName = :serviceName and s.instanceId = :instanceId")
                     .setParameter("heartbeat", heartbeat)
-                    .setParameter("serviceName", serviceName)
-                    .setParameter("instanceId", instanceId)
+                    .setParameter(FIELD_SERVICE_NAME, serviceName)
+                    .setParameter(FIELD_INSTANCE_ID, instanceId)
                     .executeUpdate();
             entityManager.flush();
             entityManager.clear();
@@ -128,12 +131,12 @@ public class ServiceRegistrationRepositoryImpl extends WaterJpaRepositoryImpl<Se
     public boolean updateHeartbeatAndStatus(String serviceName, String instanceId, Date heartbeat, ServiceStatus status) {
         logger.debug("Updating heartbeat and status for serviceName: {} and instanceId: {} to heartbeat={} status={}", serviceName, instanceId, heartbeat, status);
         Integer updated = tx(Transactional.TxType.REQUIRED, entityManager -> {
-            Integer affected = entityManager.createQuery(
-                            "update ServiceRegistration s set s.lastHeartbeat = :heartbeat, s.status = :status where s.serviceName = :serviceName and s.instanceId = :instanceId")
+                    Integer affected = entityManager.createQuery(
+                                    "update ServiceRegistration s set s.lastHeartbeat = :heartbeat, s.status = :status where s.serviceName = :serviceName and s.instanceId = :instanceId")
                     .setParameter("heartbeat", heartbeat)
-                    .setParameter("status", status)
-                    .setParameter("serviceName", serviceName)
-                    .setParameter("instanceId", instanceId)
+                    .setParameter(FIELD_STATUS, status)
+                    .setParameter(FIELD_SERVICE_NAME, serviceName)
+                    .setParameter(FIELD_INSTANCE_ID, instanceId)
                     .executeUpdate();
             entityManager.flush();
             entityManager.clear();
@@ -146,11 +149,11 @@ public class ServiceRegistrationRepositoryImpl extends WaterJpaRepositoryImpl<Se
     public void updateStatus(String serviceName, String instanceId, ServiceStatus status) {
         logger.debug("Updating status for serviceName: {} and instanceId: {} to: {}", serviceName, instanceId, status);
         Integer updated = tx(Transactional.TxType.REQUIRED, entityManager -> {
-            Integer affected = entityManager.createQuery(
-                            "update ServiceRegistration s set s.status = :status where s.serviceName = :serviceName and s.instanceId = :instanceId")
-                    .setParameter("status", status)
-                    .setParameter("serviceName", serviceName)
-                    .setParameter("instanceId", instanceId)
+                    Integer affected = entityManager.createQuery(
+                                    "update ServiceRegistration s set s.status = :status where s.serviceName = :serviceName and s.instanceId = :instanceId")
+                    .setParameter(FIELD_STATUS, status)
+                    .setParameter(FIELD_SERVICE_NAME, serviceName)
+                    .setParameter(FIELD_INSTANCE_ID, instanceId)
                     .executeUpdate();
             entityManager.flush();
             entityManager.clear();

@@ -167,8 +167,10 @@ class ServiceRegistrationApiTest implements Service {
     @Test
     @Order(5)
     void findAllShouldWork() {
-        PaginableResult<ServiceRegistration> all = this.serviceRegistrationApi.findAll(null, -1, -1, null);
+        Query query = this.serviceRegistrationRepository.getQueryBuilderInstance().createQueryFilter("serviceName=service-0");
+        PaginableResult<ServiceRegistration> all = this.serviceRegistrationApi.findAll(query, -1, -1, null);
         Assertions.assertEquals(1, all.getResults().size());
+        Assertions.assertEquals("instance-0", all.getResults().iterator().next().getInstanceId());
     }
 
     /**
@@ -178,15 +180,18 @@ class ServiceRegistrationApiTest implements Service {
     @Test
     @Order(6)
     void findAllPaginatedShouldWork() {
-        for (int i = 2; i < 11; i++) {
+        for (int i = 1; i <= 10; i++) {
             ServiceRegistration u = createServiceRegistration(i);
+            u.setServiceName("paginated-service");
+            u.setInstanceId("paginated-instance-" + i);
             this.serviceRegistrationApi.save(u);
         }
-        PaginableResult<ServiceRegistration> paginated = this.serviceRegistrationApi.findAll(null, 7, 1, null);
+        Query query = this.serviceRegistrationRepository.getQueryBuilderInstance().createQueryFilter("serviceName=paginated-service");
+        PaginableResult<ServiceRegistration> paginated = this.serviceRegistrationApi.findAll(query, 7, 1, null);
         Assertions.assertEquals(7, paginated.getResults().size());
         Assertions.assertEquals(1, paginated.getCurrentPage());
         Assertions.assertEquals(2, paginated.getNextPage());
-        paginated = this.serviceRegistrationApi.findAll(null, 7, 2, null);
+        paginated = this.serviceRegistrationApi.findAll(query, 7, 2, null);
         Assertions.assertEquals(3, paginated.getResults().size());
         Assertions.assertEquals(2, paginated.getCurrentPage());
         Assertions.assertEquals(1, paginated.getNextPage());
@@ -444,13 +449,9 @@ class ServiceRegistrationApiTest implements Service {
         service = serviceRegistrationApi.save(service);
 
         Date oldHeartbeat = service.getLastHeartbeat();
-        try {
-            Thread.sleep(100); // Small delay to ensure different timestamp
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+        Date refreshedHeartbeat = new Date(oldHeartbeat.getTime() + 1000L);
 
-        serviceRegistrationRepository.updateHeartbeat(service.getServiceName(), service.getInstanceId(), new Date());
+        serviceRegistrationRepository.updateHeartbeat(service.getServiceName(), service.getInstanceId(), refreshedHeartbeat);
         ServiceRegistration updated = serviceRegistrationRepository.findByServiceNameAndInstanceId(service.getServiceName(), service.getInstanceId());
 
         Assertions.assertTrue(updated.getLastHeartbeat().after(oldHeartbeat));

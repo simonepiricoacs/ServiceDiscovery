@@ -1,7 +1,6 @@
 package it.water.service.discovery.api;
 
 import it.water.core.api.repository.BaseRepository;
-import it.water.core.interceptors.annotations.*;
 import it.water.service.discovery.model.ServiceRegistration;
 import it.water.service.discovery.model.ServiceStatus;
 

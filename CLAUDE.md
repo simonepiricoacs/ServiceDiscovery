@@ -66,7 +66,7 @@ They are persisted and exposed by the REST contract, but the current registry lo
 Base path:
 
 ```text
-/water/api/serviceregistration
+/water/serviceregistration
 ```
 
 This is the JWT-protected CRUD boundary.

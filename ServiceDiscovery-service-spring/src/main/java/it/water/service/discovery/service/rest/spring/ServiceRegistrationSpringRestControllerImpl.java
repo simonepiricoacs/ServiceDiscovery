@@ -3,9 +3,7 @@ package it.water.service.discovery.service.rest.spring;
 
 import it.water.service.discovery.service.rest.ServiceRegistrationRestControllerImpl;
 import it.water.core.api.model.*;
-import it.water.core.api.repository.*;
 import it.water.core.api.repository.query.*;
-import it.water.service.discovery.api.*;
 import it.water.service.discovery.model.*;
 import org.springframework.web.bind.annotation.RestController;
 

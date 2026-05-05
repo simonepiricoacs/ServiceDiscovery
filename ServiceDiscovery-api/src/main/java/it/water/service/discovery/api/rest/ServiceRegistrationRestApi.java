@@ -18,7 +18,7 @@ import javax.ws.rs.core.MediaType;
  * This interfaces exposes all CRUD methods with default JAXRS annotations.
  *
  */
-@Path("/api/serviceregistration")
+@Path("/serviceregistration")
 @Api(produces = MediaType.APPLICATION_JSON, tags = "ServiceRegistration API")
 @FrameworkRestApi
 public interface ServiceRegistrationRestApi extends RestApi {

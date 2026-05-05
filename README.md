@@ -59,17 +59,17 @@ Default roles:
 
 ### Public authenticated API
 
-Base path: `/water/api/serviceregistration`
+Base path: `/water/serviceregistration`
 
 This is the standard CRUD boundary. It remains JWT-protected and is intended for administrative access.
 
 | Method | Path |
 |---|---|
-| `POST` | `/water/api/serviceregistration` |
-| `PUT` | `/water/api/serviceregistration` |
-| `GET` | `/water/api/serviceregistration/{id}` |
-| `GET` | `/water/api/serviceregistration` |
-| `DELETE` | `/water/api/serviceregistration/{id}` |
+| `POST` | `/water/serviceregistration` |
+| `PUT` | `/water/serviceregistration` |
+| `GET` | `/water/serviceregistration/{id}` |
+| `GET` | `/water/serviceregistration` |
+| `DELETE` | `/water/serviceregistration/{id}` |
 
 ### Internal anonymous API
 
