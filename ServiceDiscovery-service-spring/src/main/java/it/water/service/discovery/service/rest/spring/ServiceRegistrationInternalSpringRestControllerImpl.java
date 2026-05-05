@@ -2,9 +2,7 @@ package it.water.service.discovery.service.rest.spring;
 
 import it.water.service.discovery.model.ServiceRegistration;
 import it.water.service.discovery.service.rest.ServiceRegistrationInternalRestControllerImpl;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
 
 /**
@@ -35,9 +33,6 @@ public class ServiceRegistrationInternalSpringRestControllerImpl extends Service
     @Override
     @SuppressWarnings("java:S1185")
     public void heartbeat(String serviceName, String instanceId) {
-        if (!heartbeatInternal(serviceName, instanceId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "Service registration not found for " + serviceName + "/" + instanceId);
-        }
+        super.heartbeat(serviceName, instanceId);
     }
 }

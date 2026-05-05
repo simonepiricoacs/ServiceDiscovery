@@ -7,9 +7,8 @@ import it.water.service.discovery.api.rest.ServiceRegistrationInternalRestApi;
 import it.water.service.discovery.model.ServiceRegistration;
 import it.water.service.discovery.model.ServiceStatus;
 import lombok.Setter;
+import it.water.repository.entity.model.exceptions.EntityNotFound;
 import java.util.List;
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.Response;
 
 /**
  * Thin internal controller that delegates to the system service layer.
@@ -39,9 +38,7 @@ public class ServiceRegistrationInternalRestControllerImpl implements ServiceReg
     @Override
     public void heartbeat(String serviceName, String instanceId) {
         if (!heartbeatInternal(serviceName, instanceId)) {
-            throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
-                    .entity("Service registration not found for " + serviceName + "/" + instanceId)
-                    .build());
+            throw new EntityNotFound();
         }
     }
 
